@@ -11,13 +11,25 @@ function onOpen() {
         .addItem('Validate Import Journal', 'validateImportJournal')
         .addItem('Validate Adjustment Journal', 'validateAdjustmentJournal')
 
+    const journalStash = ui.createMenu('💾 Stash')
+        .addItem('Stash Journal', 'stashJournal')
+        .addItem('Stash Import Journal', 'stashImportJournal')
+        .addItem('Stash Adjustment Journal', 'stashAdjustmentJournal')
+
     const journalSubmenu = ui.createMenu('🧾 Journal')
         .addSubMenu(journalValidation)
+        .addSubMenu(journalStash)
+        .addSeparator()
+        .addItem('💡 Suggest Accounts', 'suggestAccounts')
         .addItem('Recalculate Balances', 'recalculateJournal')
+
+    const assetsSubmenu = ui.createMenu('💎 Assets')
+        .addItem('Find New Assets', 'findNewAssets');
 
     const toolsMenu = ui.createMenu('📒 Digitalis Accounts')
         .addSubMenu(importSubmenu)
         .addSubMenu(journalSubmenu)
+        .addSubMenu(assetsSubmenu)
         .addSeparator()
         .addItem('🔗 View Row Links', 'viewRowLinks')
         .addItem('🔍 View Row Meta', 'viewRowMeta')
@@ -40,6 +52,21 @@ function validateImportJournal() {
 }
 function validateAdjustmentJournal() {
     Journal.get(`Adjustment Journal`).validate();
+}
+
+function stashJournal() {
+    Journal.get(`Journal`).stash();
+}
+function stashImportJournal() {
+    Journal.get(`Import Journal`).stash();
+}
+function stashAdjustmentJournal() {
+    Journal.get(`Adjustment Journal`).stash();
+}
+
+function suggestAccounts() {
+    const journal = Journal.get();
+    if (journal) journal.suggestAccounts();
 }
 
 function viewRowLinks() {
@@ -148,4 +175,7 @@ function importWiseTransactions() {
 }
 function importStripeTransactions() {
     (new StripeTxnImporter(`Stripe Import`)).import(`Import Journal`);
+}
+function findNewAssets() {
+    (new AssetRegistry(`Asset Registry`)).findNewAssets(`Journal`);
 }

@@ -14,6 +14,8 @@ function withHeadedSheet(Base) {
                 this.sheet = SpreadsheetApp.getActive().getSheetByName(sheet);
             } else if (sheet instanceof Object) {
                 this.sheet = sheet;
+            } else if (sheet === null) {
+                this.sheet =  SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
             } else {
                 throw new Error("Invalid argument: must be a sheet name (string) or Sheet object");
             }
@@ -100,7 +102,63 @@ function withHeadedSheet(Base) {
 
         }
 
-        
+        rowExists(value, column = `ID`) {
+
+            return Boolean(this.findRowIndex(value, column));
+
+        }
+
+        findRowIndexes(value, column = `ID`) {
+
+            const lastRow = this.sheet.getLastRow();
+            if (lastRow <= 1) return false;
+
+            const values = this.sheet.getRange(2, this.headers.indexOf(column) + 1, lastRow - 1, 1).getValues().flat();
+
+            return values.reduce(
+                (acc, v, i) => (v === value && acc.push(i), acc),
+            []);;
+
+        }
+
+        findRowIndex(value, column = `ID`) {
+
+            const lastRow = this.sheet.getLastRow();
+            if (lastRow <= 1) return false;
+            const values = this.sheet.getRange(2, this.headers.indexOf(column) + 1, lastRow - 1, 1).getValues().flat();
+            const index  = values.indexOf(value);
+            return (index == -1) ? false : index;
+
+            //return this.findRowIndexes(value, column)[0] ?? null;
+
+        }
+
+        findRow(value, column = `ID`) {
+
+            const rowIndex = this.findRowIndex(value, column);
+            return rowIndex ? this.getData(rowIndex + 1, 1)[0] : false;
+
+        }
+
+        stash (stashName = null, hide = true) {
+
+            if (!stashName) stashName = `STASH_${this.sheet.getName()}`;
+
+            const ss   = SpreadsheetApp.getActiveSpreadsheet();
+            const data = this.sheet.getDataRange().getValues();
+
+            let stashSheet = ss.getSheetByName(stashName);
+            if (stashSheet) {
+                stashSheet.clearContents();
+            } else {
+                stashSheet = ss.insertSheet(stashName);
+                stashSheet.hideSheet();
+            }
+
+            stashSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+            if (hide) stashSheet.hideSheet();
+
+        }
 
     };
 

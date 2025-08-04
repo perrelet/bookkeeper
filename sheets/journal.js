@@ -20,6 +20,8 @@ class Journal extends withHeadedSheet(class {}) {
 
     txnExists(transactionId) {
 
+        return this.rowExists(transactionId, `parent_id`);
+
         const lastRow = this.sheet.getLastRow();
 
         if (lastRow > 1) {
@@ -115,5 +117,42 @@ class Journal extends withHeadedSheet(class {}) {
         Log.write(entries);
 
     } */
+
+    suggestAccounts() {
+
+        const row = this.getCurrentRow();
+        
+        if (row.description ?? null) {
+
+            //Log.write((row.description, 'description'));
+            //Log.write(this.findRowIndexes(row.description, 'description'));
+            //Log.write(this.findRowIndex(row.description, 'description'));
+
+            const data    = this.getData();
+            const indexes = this.findRowIndexes(row.description, 'description');
+
+            let accounts = {};
+
+            for (const index of indexes) {
+
+                const account = data[index]?.account ?? null;
+                if (!account) continue;
+
+                if (!accounts.hasOwnProperty(account)) accounts[account] = 0;
+                accounts[account]++;
+
+            }
+
+            let msg = `Account entries for description '${row.description}':\n`;
+            for (const account in accounts) msg += `· ${account}: ${accounts[account]}\n`;
+            SpreadsheetApp.getUi().alert(msg);
+            
+        } else {
+
+            SpreadsheetApp.getUi().alert(`Account column missing`);
+
+        }
+
+    }
 
 }

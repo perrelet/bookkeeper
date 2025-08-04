@@ -3,7 +3,6 @@ class Account {
     static get accounts() {
 
         if (!this._accounts) Account.loadAccounts();
-
         return this._accounts;
 
     }
