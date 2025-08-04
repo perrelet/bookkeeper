@@ -140,7 +140,7 @@ function withHeadedSheet(Base) {
 
         }
 
-        stash (stashName = null, hide = true) {
+        stash(stashName = null, hide = true) {
 
             if (!stashName) stashName = `STASH_${this.sheet.getName()}`;
 

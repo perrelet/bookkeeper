@@ -24,7 +24,8 @@ function onOpen() {
         .addItem('Recalculate Balances', 'recalculateJournal')
 
     const assetsSubmenu = ui.createMenu('💎 Assets')
-        .addItem('Find New Assets', 'findNewAssets');
+        .addItem('Find New Assets', 'findNewAssets')
+        .addItem('Stash Asset Registry', 'stashAssetRegistry');
 
     const toolsMenu = ui.createMenu('📒 Digitalis Accounts')
         .addSubMenu(importSubmenu)
@@ -176,6 +177,10 @@ function importWiseTransactions() {
 function importStripeTransactions() {
     (new StripeTxnImporter(`Stripe Import`)).import(`Import Journal`);
 }
+
 function findNewAssets() {
     (new AssetRegistry(`Asset Registry`)).findNewAssets(`Journal`);
+}
+function stashAssetRegistry() {
+    (new AssetRegistry(`Asset Registry`)).stash();
 }
