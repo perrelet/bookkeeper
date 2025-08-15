@@ -104,7 +104,7 @@ function withHeadedSheet(Base) {
 
         rowExists(value, column = `ID`) {
 
-            return Boolean(this.findRowIndex(value, column));
+            return Number.isInteger(this.findRowIndex(value, column));
 
         }
 
@@ -127,6 +127,7 @@ function withHeadedSheet(Base) {
             if (lastRow <= 1) return false;
             const values = this.sheet.getRange(2, this.headers.indexOf(column) + 1, lastRow - 1, 1).getValues().flat();
             const index  = values.indexOf(value);
+
             return (index == -1) ? false : index;
 
             //return this.findRowIndexes(value, column)[0] ?? null;
