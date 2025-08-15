@@ -34,6 +34,7 @@ function onOpen() {
         .addSeparator()
         .addItem('🔗 View Row Links', 'viewRowLinks')
         .addItem('🔍 View Row Meta', 'viewRowMeta')
+        .addItem('🧐 About this Sheet', 'aboutSheet')
         .addSeparator()
         .addItem('🧹 Clear Log', 'clearLog');
 
@@ -168,6 +169,34 @@ function viewRowMeta () {
         SpreadsheetApp.getUi().showModalDialog(html, `Metadata for Row ${row.row}:`);
 
     }
+
+}
+
+function aboutSheet() {
+
+    const ss           = SpreadsheetApp.getActiveSpreadsheet();
+    const currentSheet = ss.getActiveSheet();
+    const currentName  = currentSheet.getName();
+    const readme       = ss.getSheetByName("README");
+    const dataRange    = readme.getDataRange().getValues();
+
+    for (let i = 0; i < dataRange.length; i++) {
+
+        const row = dataRange[i];
+        const rawName = row[0];
+
+        if (rawName && rawName.replace(/^[·•\s]+/, '').trim() === currentName) {
+
+            let msg = `📘 About ${currentName}:\n\n${row[1]}`;
+            if (row[2]) msg += `\n\nPermission: ${row[2]}`;
+            SpreadsheetApp.getUi().alert(msg);
+            return;
+
+        }
+
+    }
+
+    SpreadsheetApp.getUi().alert(`No description found for sheet: ${currentName}`);
 
 }
 
