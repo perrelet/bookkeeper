@@ -4,7 +4,8 @@ function onOpen() {
 
     const importSubmenu = ui.createMenu('📥 Import')
         .addItem('Wise Transactions', 'importWiseTransactions')
-        .addItem('Stripe Transactions', 'importStripeTransactions');
+        .addItem('Stripe Transactions', 'importStripeTransactions')
+        .addItem('Personal Transactions', 'importPersonalTransactions');
 
     const journalValidation = ui.createMenu('✅ Validation')
         .addItem('Validate Full Journal', 'validateFullJournal')
@@ -76,6 +77,9 @@ function importWiseTransactions() {
 }
 function importStripeTransactions() {
     (new StripeTxnImporter(`Stripe Import`)).import(`Import Journal`);
+}
+function importPersonalTransactions() {
+    (new PersonalTxnImporter(`Personal Import`)).import(`Import Journal`);
 }
 
 function findNewAssets() {

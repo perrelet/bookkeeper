@@ -33,9 +33,13 @@ class AssetRegistry extends withHeadedSheet(class {}) {
 
         for (const entry of entries) {
 
-            if (!entry.account.toLowerCase().includes("fixed assets")) continue;
-            if (!(entry.debit_cad > 0))                                continue;
-            if (this.assetExists(entry.parent_id))                     continue;
+            if (
+                !entry.account.toLowerCase().includes("fixed assets") &&
+                !entry.account.toLowerCase().includes("intangible assets")
+            ) continue;
+
+            if (!(entry.debit_cad > 0))            continue;
+            if (this.assetExists(entry.parent_id)) continue;
 
             const account = Account.get(entry.account);
             if (!account) throw new Error(`❌ Account '${entry.account}' couldn't be found on row '${entry.row}' of ${journalSheet}.`);
@@ -43,13 +47,14 @@ class AssetRegistry extends withHeadedSheet(class {}) {
             //Log.write(cca.getClass(46));
 
             data.push(this.newRow({
-                'asset_id':   entry.parent_id,
-                'purchased':  entry.date,
-                'cost':       entry.debit_cad,
-                'account':    entry.account,
-                'cca_class':  account.ccac,
-                'journal_id': entry.id,
-                'notes':      entry.invoice,
+                'asset_id':    entry.parent_id,
+                'purchased':   entry.date,
+                'cost':        entry.debit_cad,
+                'account':     entry.account,
+                'cca_class':   account.ccac,
+                'description': entry.description,
+                'journal_id':  entry.id,
+                'notes':       entry.invoice,
             }));
 
         }
