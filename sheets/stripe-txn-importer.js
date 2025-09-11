@@ -18,7 +18,7 @@ class StripeTxnImporter extends Importer {
         const revenueAccount = Account.get(8000.1);
         //const wiseAccount   = Account.get(1002.1);
         const feeAccount    = Account.get(8710.2);
-        const taxAccount    = Account.get(2680);
+        const taxAccount    = Account.get(2680.1);
 
         for (let row of this.data.reverse()) {
 
