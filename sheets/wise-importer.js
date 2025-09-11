@@ -6,16 +6,11 @@ class WiseImporter extends Importer {
 
     }
 
-     import(targetSheet = `Import Journal`) {
+    import(targetSheet = `Import Journal`) {
 
         if (!this.confirm()) return;
 
-        const journal       = Journal.get(targetSheet);
-        const debitCol      = journal.headerIndex(`debit_cad`);
-        const creditCol     = journal.headerIndex(`credit_cad`);
-        const accountCol    = journal.headerIndex(`account`);
-        const urlCol        = journal.headerIndex(`url`);
-        const metaCol       = journal.headerIndex(`meta`);
+        const journal = Journal.get(targetSheet);
 
         this.onStart(journal);
 
@@ -103,82 +98,70 @@ class WiseImporter extends Importer {
             if (fee) {
 
                 feeCAD = fee * fxRate;
-                
-                feeEntry = [
-                    createdOn,
-                    Account.get(8710.1).label,
-                    feeCAD,
-                    ``,
-                    fee,
-                    currency,
-                    fxRate,
-                    ``, // Client (manual)
-                    ``, // Invoice (manual)
-                    `Transaction fees for ${row.id}`,
-                    row.id,
-                    `Wise`,
-                    ``,
-                    ``
-                ];
+
+                feeEntry = journal.newRow({
+                    'date':             createdOn,
+                    'account':          Account.get(8710.1).label,
+                    'debit_cad':        feeCAD,
+                    'orginal_amount':   fee,
+                    'orginal_currency': currency,
+                    'exchange_rate':    fxRate,
+                    'description':      `Transaction fees for ${row.id}`,
+                    'parent_id':        row.id,
+                    'source':           `Wise`,
+                });
 
             }
 
             let description = `${row.source_name} → ${row.target_name}`;
             if (row.category) description += ` "${row.category}"`;
-            if (row.note) description += ` (${row.note})`;
+            if (row.note)     description += ` (${row.note})`;
 
-            let entry = [
-                createdOn,
-                ``,
-                ``,
-                ``,
-                originalAmt,
-                currency,
-                fxRate,
-                ``, // Client (manual)
-                ``, // Invoice (manual)
-                description,
-                row.id,
-                `Wise`,
-                ``,
-                ``
-            ];
+            const entry = journal.newRow({
+                'date':             createdOn,
+                'orginal_amount':   originalAmt,
+                'orginal_currency': currency,
+                'exchange_rate':    fxRate,
+                'description':      description,
+                'parent_id':        row.id,
+                'source':           `Wise`,
+            });
 
-            let drEntry = [...entry];
-            let crEntry = [...entry];
+            let drEntry = {...entry};
+            let crEntry = {...entry};
 
             switch (row.direction) {
 
                 case 'NEUTRAL':
 
-                    //drEntry[accountCol] = `Bank (Wise - ${row.source_currency})`;
-                    drEntry[debitCol]   = feeCAD ? cadValue - feeCAD : cadValue;
-                    drEntry[urlCol]     = url;
-                    drEntry[metaCol]    = JSON.stringify(row);
-                    //crEntry[accountCol] = `Bank (Wise - ${row.target_currency})`; // May be moving to tax account, it's ambigious...
-                    crEntry[creditCol]  = cadValue;
-                    crEntry[urlCol]     = url;
-                    crEntry[metaCol]    = JSON.stringify(row);
+                    //drEntry.account  = `Bank (Wise - ${row.source_currency})`;
+                    drEntry.debit_cad  = feeCAD ? cadValue - feeCAD : cadValue;
+                    drEntry.url        = url;
+                    drEntry.meta       = JSON.stringify(row);
+                    //crEntry.account  = `Bank (Wise - ${row.target_currency})`; // May be moving to tax account, it's ambigious...
+                    crEntry.credit_cad = cadValue;
+                    crEntry.url        = url;
+                    crEntry.meta       = JSON.stringify(row);
                     break;
 
                 case 'IN':
 
-                    drEntry[accountCol] = Account.nameToLabel(wiseAccount);
-                    drEntry[debitCol]   = feeCAD ? cadValue - feeCAD : cadValue;
-                    drEntry[urlCol]     = url;
-                    drEntry[metaCol]    = JSON.stringify(row);
-                    crEntry[accountCol] = Account.nameToLabel(categoryAccount);
-                    crEntry[creditCol]  = cadValue;
+                    drEntry.account    = Account.nameToLabel(wiseAccount);
+                    drEntry.debit_cad  = feeCAD ? cadValue - feeCAD : cadValue;
+                    drEntry.url        = url;
+                    drEntry.meta       = JSON.stringify(row);
+                    crEntry.account    = Account.nameToLabel(categoryAccount);
+                    crEntry.credit_cad = cadValue;
                     break;
 
                 case 'OUT':
 
-                    drEntry[accountCol] = Account.nameToLabel(categoryAccount);
-                    drEntry[debitCol]   = feeCAD ? cadValue - feeCAD : cadValue;
-                    crEntry[accountCol] = Account.nameToLabel(wiseAccount);
-                    crEntry[creditCol]  = cadValue;
-                    crEntry[urlCol]     = url;
-                    crEntry[metaCol]    = JSON.stringify(row);
+                    drEntry.account    = Account.nameToLabel(categoryAccount);
+                    drEntry.debit_cad  = feeCAD ? cadValue - feeCAD : cadValue;
+                    crEntry.account    = Account.nameToLabel(wiseAccount);
+                    crEntry.credit_cad = cadValue;
+                    crEntry.url        = url;
+                    crEntry.meta       = JSON.stringify(row);
                     break;
                 
                 default:
