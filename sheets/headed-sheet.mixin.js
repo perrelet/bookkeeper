@@ -71,16 +71,34 @@ function withHeadedSheet(Base) {
 
         }
 
+        getLastUsedRowInColumn(column = 1) {
+
+            if (!Number.isInteger(column)) column = this.headers.indexOf(column) + 1;
+
+            const values = this.sheet.getRange(1, column, this.sheet.getMaxRows(), 1).getValues();
+
+            for (let i = values.length - 1; i >= 0; i--) if (values[i][0] !== "") return i + 1;
+
+            return this.sheet.getLastRow();
+
+        }
+
         append(data) {
 
             if (!Array.isArray(data) || data.length === 0) return;
+
+            //if (!Number.isInteger(colStart)) colStart = this.headers.indexOf(colStart) + 1;
 
             if (typeof data[0] === 'object' && !Array.isArray(data[0])) {
                 data = data.map(row => this.headers.map(header => row[header] ?? ''));
             }
 
+            //const rowStart = (colStart == 1) ? this.sheet.getLastRow() : this.getLastUsedRowInColumn(colStart);
+            const rowStart = this.sheet.getLastRow();
+            const colStart = 1;
+
             this.sheet
-                .getRange(this.sheet.getLastRow() + 1, 1, data.length, data[0].length)
+                .getRange(rowStart + 1, colStart, data.length, data[0].length)
                 .setValues(data);
 
         }
@@ -117,7 +135,7 @@ function withHeadedSheet(Base) {
 
             return values.reduce(
                 (acc, v, i) => (v === value && acc.push(i), acc),
-            []);;
+            []);
 
         }
 
