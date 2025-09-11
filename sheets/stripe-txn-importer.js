@@ -78,6 +78,8 @@ class StripeTxnImporter extends Importer {
             credit.invoice     = row.order_id_metadata;
             credit.description = description;
 
+            if (row.order_id_metadata) credit.url = `https://digitalis.ca/account/invoices/${row.order_id_metadata}/`;
+
             let tax = {...entry};
             if (row.tax_amount_metadata) {
 
