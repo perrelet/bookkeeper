@@ -2,50 +2,63 @@ function onOpen() {
 
     const ui = SpreadsheetApp.getUi();
 
-    const importSubmenu = ui.createMenu('📥 Import')
+    const digitalisMenu = ui.createMenu('📒 Digitalis Accounts')
+    .addSubMenu(ui.createMenu('📥 Import')
         .addItem('Wise Transactions', 'importWiseTransactions')
         .addItem('Stripe Transactions', 'importStripeTransactions')
-        .addItem('Personal Transactions', 'importPersonalTransactions');
-
-    const journalValidation = ui.createMenu('✅ Validation')
-        .addItem('Validate Full Journal', 'validateFullJournal')
-        .addItem('Validate Import Journal', 'validateImportJournal')
-        .addItem('Validate Adjustment Journal', 'validateAdjustmentJournal')
-
-    const journalStash = ui.createMenu('💾 Stash')
-        .addItem('Stash Journal', 'stashJournal')
-        .addItem('Stash Import Journal', 'stashImportJournal')
-        .addItem('Stash Adjustment Journal', 'stashAdjustmentJournal')
-
-    const journalSubmenu = ui.createMenu('🧾 Journal')
-        .addSubMenu(journalValidation)
-        .addSubMenu(journalStash)
+        .addItem('Personal Transactions', 'importPersonalTransactions')
+    )
+    .addSubMenu(ui.createMenu('🧾 Journal')
+        .addSubMenu(ui.createMenu('✅ Validation')
+            .addItem('Validate Full Journal', 'validateFullJournal')
+            .addItem('Validate Import Journal', 'validateImportJournal')
+            .addItem('Validate Adjustment Journal', 'validateAdjustmentJournal')
+        )
+        .addSubMenu(ui.createMenu('💾 Stash')
+            .addItem('Stash Journal', 'stashJournal')
+            .addItem('Stash Import Journal', 'stashImportJournal')
+            .addItem('Stash Adjustment Journal', 'stashAdjustmentJournal')
+        )
         .addSeparator()
         .addItem('💡 Suggest Accounts', 'suggestAccounts')
+        .addItem('💰 Create GST Adjustment', 'createGSTAdjustment')
         .addItem('Recalculate Balances', 'recalculateJournal')
-
-    const assetsSubmenu = ui.createMenu('💎 Assets')
+    )
+    .addSubMenu(ui.createMenu('💎 Assets')
         .addItem('Find New Assets', 'findNewAssets')
-        .addItem('Stash Asset Registry', 'stashAssetRegistry');
-
-    const toolsMenu = ui.createMenu('📒 Digitalis Accounts')
-        .addSubMenu(importSubmenu)
-        .addSubMenu(journalSubmenu)
-        .addSubMenu(assetsSubmenu)
-        .addSeparator()
-        .addItem('🔗 View Row Links', 'viewRowLinks')
-        .addItem('🔍 View Row Meta', 'viewRowMeta')
-        .addItem('🧐 About this Sheet', 'aboutSheet')
-        .addSeparator()
-        .addItem('🧹 Clear Log', 'clearLog');
-
-    toolsMenu.addToUi();
+        .addItem('Stash Asset Registry', 'stashAssetRegistry')
+    )
+    .addSubMenu(ui.createMenu('📑 Invoices')
+        .addItem('Update Invoices', 'updateInvoices')
+        .addItem('Find Invoice Entry', 'findInvoiceEntry')
+    )
+    .addSeparator()
+    .addItem('🔗 View Row Links', 'viewRowLinks')
+    .addItem('🔍 View Row Meta', 'viewRowMeta')
+    .addItem('🧐 About this Sheet', 'aboutSheet')
+    .addSeparator()
+    .addItem('🧹 Clear Log', 'clearLog')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('⚙️ Options')
+        .addItem('🔑 Set ERP Credentials', 'setERPCredentials')
+    )
+    .addToUi();
 
 }
+
+// ---
 
 function clearLog() {
     Log.get().clear();
 }
+
+// ---
+
+function setERPCredentials() {
+    ERP.setCredentials();
+}
+
+// ---
 
 function validateFullJournal() {
     Journal.get(`Journal`).validate();
@@ -71,6 +84,10 @@ function suggestAccounts() {
     const journal = Journal.get();
     if (journal) journal.suggestAccounts();
 }
+function createGSTAdjustment () {
+    const journal = Journal.get(SpreadsheetApp.getActiveSpreadsheet().getActiveSheet().getName());
+    if (journal) journal.createGSTAdjustment();
+}
 
 function importWiseTransactions() {
     (new WiseImporter(`Wise Import`)).import(`Import Journal`);
@@ -81,6 +98,17 @@ function importStripeTransactions() {
 function importPersonalTransactions() {
     (new PersonalTxnImporter(`Personal Import`)).import(`Import Journal`);
 }
+
+// ---
+
+function updateInvoices () {
+    (new InvoicesRaw()).update();
+}
+function findInvoiceEntry () {
+    (new Invoices()).findEntry();
+}
+
+// ---
 
 function findNewAssets() {
     (new AssetRegistry(`Asset Registry`)).findNewAssets(`Journal`);
