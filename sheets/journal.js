@@ -155,4 +155,20 @@ class Journal extends withHeadedSheet(class {}) {
 
     }
 
+    createGSTAdjustment () {
+
+        const entry = this.getCurrentRow();
+
+        if (!entry.account) throw new Error(`❌ Entry is missing an account name.`);
+        
+        const account = Account.get(entry.account);
+        if (!account)                          throw new Error(`❌ Account '${entry.account}' not found.`);
+        if (account.account_type != `Expense`) throw new Error(`❌ Entry must be an expense.`);
+
+        // check if entry already exists
+
+        // create entry
+
+    }
+
 }
