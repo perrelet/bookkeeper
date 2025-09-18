@@ -55,6 +55,7 @@ class PersonalTxnImporter extends Importer {
             let debit = {...entry};
             debit.account           = debitAccount.label;
             debit.debit_cad         = cadValue;
+            debit.itc_cad           = (row.gst == ``) ? `` : factor * parseFloat(row.gst);
             debit.invoice           = row.notes;
             debit.description       = description;
 
