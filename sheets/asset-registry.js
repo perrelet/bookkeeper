@@ -49,7 +49,7 @@ class AssetRegistry extends withHeadedSheet(class {}) {
             data.push(this.newRow({
                 'asset_id':    entry.parent_id,
                 'purchased':   entry.date,
-                'cost':        entry.debit_cad,
+                'cost':        entry.debit_cad - (entry.itc_cad || 0),
                 'account':     entry.account,
                 'cca_class':   account.ccac,
                 'description': entry.description,
