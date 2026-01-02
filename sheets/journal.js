@@ -4,6 +4,8 @@ class Journal extends withHeadedSheet(class {}) {
 
         if (!this._journals) this._journals = {};
 
+        // TODO: Ensure sheetName is indeed a journal 
+
         if (!(sheetName in this._journals)) this._journals[sheetName] = new Journal(sheetName);
 
         return this._journals[sheetName];
@@ -21,19 +23,6 @@ class Journal extends withHeadedSheet(class {}) {
     txnExists(transactionId) {
 
         return this.rowExists(transactionId, `parent_id`);
-
-        const lastRow = this.sheet.getLastRow();
-
-        if (lastRow > 1) {
-
-            const ids = this.sheet.getRange(2, this.headers.indexOf(`parent_id`) + 1, lastRow - 1, 1).getValues().flat();
-            return ids.includes(transactionId);
-
-        } else {
-
-            return false;
-
-        }
 
     }
 
