@@ -25,9 +25,24 @@ class WiseImporter extends Importer {
 
             }
 
-            if (['CANCELLED', 'REFUNDED'].includes(row.status)) {
+            if (['CANCELLED'].includes(row.status)) {
 
-                this.results.skipped[row.id] = row;
+                this.skip(row.id, row, 'cancelled_transaction');
+                continue;
+
+            }
+
+            if (row.note.includes(`[[VOID]]`)) {
+
+                /*
+                    Wise exports don't differentiate between cancelled transactions and refunded ones, both have status REFUNDED.
+                    For example: 
+                        Cancelled: https://wise.com/transactions/activities/by-resource/CARD_TRANSACTION/1874336845
+                        Refunded:  https://wise.com/transactions/activities/by-resource/CARD_TRANSACTION/2856171238
+                    Workaround: Add note containing "[[VOID]]" in wise to (non-zero) cancelled transactions to skip them here.
+                */
+
+                this.skip(row.id, row, 'void_transaction');
                 continue;
 
             }
@@ -35,7 +50,7 @@ class WiseImporter extends Importer {
             const srcAmt = parseFloat(row.source_amount_after_fees) || 0;
             if (!srcAmt) {
 
-                this.results.skipped[row.id] = row;
+                this.skip(row.id, row, 'missing_source_amount');
                 continue;
 
             }
@@ -102,31 +117,36 @@ class WiseImporter extends Importer {
                 feeCAD = fee * fxRate;
 
                 feeEntry = journal.newRow({
-                    'date':             createdOn,
-                    'account':          Account.get(8710.1).label,
-                    'debit_cad':        feeCAD,
-                    'orginal_amount':   fee,
-                    'orginal_currency': currency,
-                    'exchange_rate':    fxRate,
-                    'description':      `Transaction fees for ${row.id}`,
-                    'parent_id':        row.id,
-                    'source':           `Wise`,
+                    'date':              createdOn,
+                    'account':           Account.get(8710.1).label,
+                    'debit_cad':         feeCAD,
+                    'original_amount':   fee,
+                    'original_currency': currency,
+                    'exchange_rate':     fxRate,
+                    'description':       `Transaction fees for ${row.id}`,
+                    'parent_id':         row.id,
+                    'source':            `Wise`,
+                    'url':               url,
+                    'meta':              JSON.stringify(row),
                 });
 
             }
 
             let description = `${row.source_name} → ${row.target_name}`;
-            if (row.category) description += ` "${row.category}"`;
-            if (row.note)     description += ` (${row.note})`;
+            if (row.category)              description += ` "${row.category}"`;
+            if (row.note)                  description += ` (${row.note})`;
+            if (row.status != 'COMPLETED') description += ` [${row.status}]`;
 
             const entry = journal.newRow({
-                'date':             createdOn,
-                'orginal_amount':   originalAmt,
-                'orginal_currency': currency,
-                'exchange_rate':    fxRate,
-                'description':      description,
-                'parent_id':        row.id,
-                'source':           `Wise`,
+                'date':              createdOn,
+                'original_amount':   originalAmt,
+                'original_currency': currency,
+                'exchange_rate':     fxRate,
+                'description':       description,
+                'parent_id':         row.id,
+                'source':            `Wise`,
+                'url':               url,
+                'meta':              JSON.stringify(row),
             });
 
             let drEntry = {...entry};
@@ -138,20 +158,20 @@ class WiseImporter extends Importer {
 
                     //drEntry.account  = `Bank (Wise - ${row.source_currency})`;
                     drEntry.debit_cad  = feeCAD ? cadValue - feeCAD : cadValue;
-                    drEntry.url        = url;
-                    drEntry.meta       = JSON.stringify(row);
+                    //drEntry.url        = url;
+                    //drEntry.meta       = JSON.stringify(row);
                     //crEntry.account  = `Bank (Wise - ${row.target_currency})`; // May be moving to tax account, it's ambigious...
                     crEntry.credit_cad = cadValue;
-                    crEntry.url        = url;
-                    crEntry.meta       = JSON.stringify(row);
+                    //crEntry.url        = url;
+                    //crEntry.meta       = JSON.stringify(row);
                     break;
 
                 case 'IN':
 
                     drEntry.account    = Account.nameToLabel(wiseAccount);
                     drEntry.debit_cad  = feeCAD ? cadValue - feeCAD : cadValue;
-                    drEntry.url        = url;
-                    drEntry.meta       = JSON.stringify(row);
+                    //drEntry.url        = url;
+                    //drEntry.meta       = JSON.stringify(row);
                     crEntry.account    = Account.nameToLabel(categoryAccount);
                     crEntry.credit_cad = cadValue;
                     break;
@@ -162,12 +182,13 @@ class WiseImporter extends Importer {
                     drEntry.debit_cad  = feeCAD ? cadValue - feeCAD : cadValue;
                     crEntry.account    = Account.nameToLabel(wiseAccount);
                     crEntry.credit_cad = cadValue;
-                    crEntry.url        = url;
-                    crEntry.meta       = JSON.stringify(row);
+                    //crEntry.url        = url;
+                    //crEntry.meta       = JSON.stringify(row);
                     break;
                 
                 default:
-                    this.results.skipped[row.id] = row;
+
+                    this.skip(row.id, row, 'unknown_direction');
                     SpreadsheetApp.getUi().alert(`Transaction ${row.id} skipped as its direction '${row.direction}' is not recognised.`)
                     continue;
 
