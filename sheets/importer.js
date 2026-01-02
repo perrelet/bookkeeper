@@ -36,6 +36,7 @@ class Importer extends withHeadedSheet(class {}) {
         this.data = this.getData();
         this.entries = [];
         this.results = {
+            'processed':  0,
             'added':      {},
             'skipped':    {},
             'duplicates': {},
@@ -45,11 +46,41 @@ class Importer extends withHeadedSheet(class {}) {
 
     onComplete(journal) {
 
-        SpreadsheetApp.getUi().alert(`Import Completed ${this.sheet.getName()} -> ${journal.sheet.getName()}
-            Parsed Transactions: ${this.data.length}
+        let msg = `Import Completed ${this.sheet.getName()} -> ${journal.sheet.getName()}
+            Parsed Transactions: ${this.results.processed}
             Added Transactions: ${Object.entries(this.results.added).length}
             Duplicate Transactions: ${Object.entries(this.results.duplicates).length}
-            Skipped Transactions: ${Object.entries(this.results.skipped).length}`);
+            `;
+
+        if (typeof this.results.skipped === 'object') {
+
+            msg += `Skipped Transactions:`;
+            for (const [key, value] of Object.entries(this.results.skipped)) {
+                msg += `\n- ${key}: ${Object.entries(value).length}`;
+            }
+
+        } else {
+
+            msg += `Skipped Transactions: ${Object.entries(this.results.skipped).length}`;
+
+        }
+
+        SpreadsheetApp.getUi().alert(msg);
+
+    }
+
+    skip (id, row, reason = null) {
+
+        if (reason) {
+
+            if (!this.results.skipped.hasOwnProperty(reason)) this.results.skipped[reason] = {};
+            this.results.skipped[reason][id] = row;
+
+        } else {
+
+            this.results.skipped[id] = row;
+
+        }
 
     }
 
