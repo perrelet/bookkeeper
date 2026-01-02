@@ -111,8 +111,8 @@ function findInvoiceEntry () {
 // ---
 
 function findNewAssets() {
-    (new AssetRegistry(`Asset Registry`)).findNewAssets(`Journal`);
+    (new AssetRegistry(`Assets`)).findNewAssets(`Journal`);
 }
 function stashAssetRegistry() {
-    (new AssetRegistry(`Asset Registry`)).stash();
+    (new AssetRegistry(`Assets`)).stash();
 }
