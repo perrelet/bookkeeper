@@ -16,6 +16,8 @@ class PersonalTxnImporter extends Importer {
 
         for (let row of this.data.reverse()) {
 
+            this.results.processed++;
+
             const date = new Date(row.tx_date);
             const id   = Utils.toSnakeCase(row.account) + `-` + date.getFullYear() + `-` + (date.getMonth() + 1) + `-` + date.getDate() + `-` + Utils.toSnakeCase(row.description) + `-` + row.amount;
 

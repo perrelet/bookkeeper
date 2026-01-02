@@ -22,6 +22,8 @@ class StripeTxnImporter extends Importer {
 
         for (let row of this.data.reverse()) {
 
+            this.results.processed++;
+
             if (journal.txnExists(row.id)) {
 
                 this.results.duplicates[row.id] = row;
