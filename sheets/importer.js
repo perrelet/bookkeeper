@@ -69,7 +69,7 @@ class Importer extends withHeadedSheet(class {}) {
 
     }
 
-    skip (id, row, reason = null) {
+    skip (id, row, reason = null, log = true) {
 
         if (reason) {
 
@@ -79,6 +79,15 @@ class Importer extends withHeadedSheet(class {}) {
         } else {
 
             this.results.skipped[id] = row;
+
+        }
+
+        if (log) {
+
+            let message = `Skipped txn ${id}`;
+            if (reason) message += ` (${reason})`;
+            message += ` | ` + JSON.stringify(row);
+            Log.write(message)
 
         }
 
