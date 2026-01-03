@@ -1,9 +1,7 @@
 class WiseImporter extends Importer {
 
     constructor(sheetName = `Wise Import`) {
-
         super(sheetName);
-
     }
 
     import(targetSheet = `Import Journal`) {
@@ -19,110 +17,124 @@ class WiseImporter extends Importer {
             this.results.processed++;
 
             if (journal.txnExists(row.id)) {
-
                 this.results.duplicates[row.id] = row;
                 continue;
-
             }
 
             if (['CANCELLED'].includes(row.status)) {
-
                 this.skip(row.id, row, 'cancelled_transaction');
                 continue;
-
             }
 
-            if (row.note.includes(`[[VOID]]`)) {
-
-                /*
-                    Wise exports don't differentiate between cancelled transactions and refunded ones, both have status REFUNDED.
-                    For example: 
-                        Cancelled: https://wise.com/transactions/activities/by-resource/CARD_TRANSACTION/1874336845
-                        Refunded:  https://wise.com/transactions/activities/by-resource/CARD_TRANSACTION/2856171238
-                    Workaround: Add note containing "[[VOID]]" in wise to (non-zero) cancelled transactions to skip them here.
-                */
-
+            if (row.note && row.note.includes(`[[VOID]]`)) {
                 this.skip(row.id, row, 'void_transaction');
                 continue;
-
             }
 
             const srcAmt = parseFloat(row.source_amount_after_fees) || 0;
-            if (!srcAmt) {
+            const tgtAmt = parseFloat(row.target_amount_after_fees) || 0;
 
-                this.skip(row.id, row, 'missing_source_amount');
+            if (!srcAmt && !tgtAmt) {
+                this.skip(row.id, row, 'missing_amounts');
                 continue;
-
             }
 
             const createdOn = new Date(row.created_on);
-            const tgtAmt    = parseFloat(row.target_amount_after_fees) || 0;
-            const srcFee    = parseFloat(row.source_fee_amount) || 0;
-            const tgtFee    = parseFloat(row.target_fee_amount) || 0;
             const rate      = parseFloat(row.exchange_rate) || 1;
             const url       = `https://wise.com/transactions/activities/by-resource/` + row.id.replace(`-`, `/`);
 
-            let wiseAccount = '', categoryAccount = '', originalAmt = '', fxRate = '', currency = '';
+            /*
+                Determine the CAD value of the main movement.
+
+                Rule:
+                - If either side is CAD, the CAD value is the CAD side after fees.
+                - If neither side is CAD, convert the source amount after fees using FX.getRate(sourceCurrency -> CAD).
+            */
             let cadValue = 0;
 
-            if (row.source_currency === 'CAD' && row.target_currency === 'CAD') {
-
-                cadValue    = srcAmt;
-                currency    = 'CAD';
-                fxRate      = 1;
-                originalAmt = srcAmt;
-                wiseAccount = `Bank (Wise - CAD)`;
-
+            if (row.source_currency === 'CAD') {
+                cadValue = srcAmt;
             } else if (row.target_currency === 'CAD') {
-
-                cadValue    = tgtAmt;
-                currency    = row.source_currency;
-                fxRate      = rate;
-                originalAmt = srcAmt;
-                wiseAccount = `Bank (Wise - ${row.source_currency})`;
-
-            } else if (row.source_currency === 'CAD') {
-
-                cadValue    = srcAmt;
-                currency    = row.target_currency;
-                fxRate      = rate;
-                originalAmt = tgtAmt;
-                wiseAccount = `Bank (Wise - ${row.source_currency})`;
-
+                cadValue = tgtAmt;
             } else {
-
-                const fxCAD = FX.getRate(row.source_currency, createdOn);
-
-                if (!fxCAD) {
-
-                    Logger.log(`Missing CAD exchange rate for ${row.source_currency} on ${createdOn}`);
-                    continue; // skip or flag this row
-
+                const fxToCAD = FX.getRate(row.source_currency, createdOn);
+                if (!fxToCAD) {
+                    this.skip(row.id, row, 'missing_fx_to_cad');
+                    continue;
                 }
-
-                cadValue    = srcAmt * fxCAD;
-                currency    = row.source_currency;
-                fxRate      = fxCAD;
-                originalAmt = srcAmt;
-                wiseAccount = `Bank (Wise - ${row.source_currency})`;
-            
+                cadValue = srcAmt * fxToCAD;
             }
 
-            const fee = srcFee ? srcFee : (tgtFee ? tgtFee : 0);
-            let feeEntry = false, feeCAD = false;
-            //const feeCur = srcFeeCur ? srcFeeCur : tgtFeeCur;
+            /*
+                Decide fee amount, fee currency, and which side paid it.
+
+                Wise usually uses source fees.
+                If target_fee_amount exists, treat that as target-paid.
+            */
+            const srcFee = parseFloat(row.source_fee_amount) || 0;
+            const tgtFee = parseFloat(row.target_fee_amount) || 0;
+
+            let fee = 0;
+            let feeCurrency = '';
+            let feeSide = ''; // 'source' or 'target'
+
+            if (srcFee) {
+                fee = srcFee;
+                feeCurrency = row.source_fee_currency || row.source_currency;
+                feeSide = 'source';
+            } else if (tgtFee) {
+                fee = tgtFee;
+                feeCurrency = row.target_fee_currency || row.target_currency;
+                feeSide = 'target';
+            }
+
+            /*
+                Convert fee to CAD using feeCurrency -> CAD spot, not exchange_rate.
+            */
+            let feeCAD = 0;
+
+            if (fee) {
+                if (feeCurrency === 'CAD') {
+                    feeCAD = fee;
+                } else {
+                    const feeFxToCAD = FX.getRate(feeCurrency, createdOn);
+                    if (!feeFxToCAD) {
+                        this.skip(row.id, row, 'missing_fee_fx_to_cad');
+                        continue;
+                    }
+                    feeCAD = fee * feeFxToCAD;
+                }
+            }
+
+            /*
+                Build description.
+            */
+            let description = `${row.source_name} → ${row.target_name}`;
+            if (row.category)              description += ` "${row.category}"`;
+            if (row.note)                  description += ` (${row.note})`;
+            if (row.status !== 'COMPLETED') description += ` [${row.status}]`;
+
+            /*
+                Create fee entry (separate line), if any.
+                Original currency for fee should be the fee currency.
+                Exchange rate stored should match feeCurrency -> CAD for audit.
+            */
+            let feeEntry = false;
 
             if (fee) {
 
-                feeCAD = fee * fxRate;
+                let feeFxUsed = 1;
+                if (feeCurrency !== 'CAD') {
+                    feeFxUsed = FX.getRate(feeCurrency, createdOn);
+                }
 
                 feeEntry = journal.newRow({
                     'date':              createdOn,
                     'account':           Account.get(8710.1).label,
                     'debit_cad':         feeCAD,
                     'original_amount':   fee,
-                    'original_currency': currency,
-                    'exchange_rate':     fxRate,
+                    'original_currency': feeCurrency,
+                    'exchange_rate':     feeFxUsed,
                     'description':       `Transaction fees for ${row.id}`,
                     'parent_id':         row.id,
                     'source':            `Wise`,
@@ -132,64 +144,109 @@ class WiseImporter extends Importer {
 
             }
 
-            let description = `${row.source_name} → ${row.target_name}`;
-            if (row.category)              description += ` "${row.category}"`;
-            if (row.note)                  description += ` (${row.note})`;
-            if (row.status != 'COMPLETED') description += ` [${row.status}]`;
+            const originalCur = row.source_currency;
 
-            const entry = journal.newRow({
+            // Exchange rate stored should represent originalCur -> CAD for reporting.
+            // If Wise target is CAD, Wise exchange_rate is usually the correct originalCur->CAD rate.
+            // Otherwise fall back to your FX table.
+
+            let fxToCAD = 1;
+
+            if (originalCur === 'CAD') {
+                fxToCAD = 1;
+            } else if (row.target_currency === 'CAD' && rate) {
+                fxToCAD = rate;
+            } else {
+                fxToCAD = FX.getRate(originalCur, createdOn);
+                if (!fxToCAD) {
+                    this.skip(row.id, row, 'missing_fx_to_cad');
+                    continue;
+                }
+            }
+
+            const baseEntry = journal.newRow({
                 'date':              createdOn,
-                'original_amount':   originalAmt,
-                'original_currency': currency,
-                'exchange_rate':     fxRate,
+                'original_amount':   srcAmt,
+                'original_currency': originalCur,
+                'exchange_rate':     fxToCAD,
                 'description':       description,
                 'parent_id':         row.id,
                 'source':            `Wise`,
-                'url':               url,
-                'meta':              JSON.stringify(row),
             });
 
-            let drEntry = {...entry};
-            let crEntry = {...entry};
+            let drEntry = { ...baseEntry };
+            let crEntry = { ...baseEntry };
 
+            /*
+                Determine the Wise bank account label you want to auto-fill for IN/OUT.
+                For NEUTRAL you said you want manual assignment, so we leave accounts blank there.
+            */
+            const wiseBankSource = Account.nameToLabel(`Bank (Wise - ${row.source_currency})`);
+            const wiseBankTarget = Account.nameToLabel(`Bank (Wise - ${row.target_currency})`);
+
+            /*
+                categoryAccount stays manual in your system.
+                Keep as empty string here, so you can fill or post-process.
+            */
+            let categoryAccount = '';
+
+            /*
+                Posting rules that reconcile to Wise balance statements:
+
+                OUT:
+                    Dr category            cadValue
+                    Dr fee expense         feeCAD (separate line)
+                    Cr Wise bank           cadValue + feeCAD   (bank paid the fee)
+
+                IN:
+                    Dr Wise bank           cadValue            (bank received net)
+                    Dr fee expense         feeCAD (separate line)
+                    Cr category            cadValue + feeCAD   (grossed up to include withheld fee)
+
+                NEUTRAL:
+                    Keep accounts manual.
+                    If feeSide == 'source':
+                        Receiving leg stays cadValue
+                        Opposite leg becomes cadValue + feeCAD
+                    If feeSide == 'target' (rare):
+                        Receiving leg is cadValue (still)
+                        Opposite leg is cadValue + feeCAD, but conceptually fee is on target side
+                        Without fixed accounts, we still balance by grossing the opposite leg.
+            */
             switch (row.direction) {
 
                 case 'NEUTRAL':
 
-                    //drEntry.account  = `Bank (Wise - ${row.source_currency})`;
-                    drEntry.debit_cad  = feeCAD ? cadValue - feeCAD : cadValue;
-                    //drEntry.url        = url;
-                    //drEntry.meta       = JSON.stringify(row);
-                    //crEntry.account  = `Bank (Wise - ${row.target_currency})`; // May be moving to tax account, it's ambigious...
-                    crEntry.credit_cad = cadValue;
-                    //crEntry.url        = url;
-                    //crEntry.meta       = JSON.stringify(row);
+                    drEntry.debit_cad  = cadValue;
+
+                    crEntry.credit_cad = feeCAD ? cadValue + feeCAD : cadValue;
+
                     break;
 
                 case 'IN':
 
-                    drEntry.account    = Account.nameToLabel(wiseAccount);
-                    drEntry.debit_cad  = feeCAD ? cadValue - feeCAD : cadValue;
-                    //drEntry.url        = url;
-                    //drEntry.meta       = JSON.stringify(row);
+                    drEntry.account    = wiseBankTarget;  // money lands in target currency balance
+                    drEntry.debit_cad  = cadValue;
+
                     crEntry.account    = Account.nameToLabel(categoryAccount);
-                    crEntry.credit_cad = cadValue;
+                    crEntry.credit_cad = feeCAD ? cadValue + feeCAD : cadValue;
+
                     break;
 
                 case 'OUT':
 
                     drEntry.account    = Account.nameToLabel(categoryAccount);
-                    drEntry.debit_cad  = feeCAD ? cadValue - feeCAD : cadValue;
-                    crEntry.account    = Account.nameToLabel(wiseAccount);
-                    crEntry.credit_cad = cadValue;
-                    //crEntry.url        = url;
-                    //crEntry.meta       = JSON.stringify(row);
+                    drEntry.debit_cad  = cadValue;
+
+                    crEntry.account    = wiseBankSource;  // money leaves source currency balance
+                    crEntry.credit_cad = feeCAD ? cadValue + feeCAD : cadValue;
+
                     break;
-                
+
                 default:
 
                     this.skip(row.id, row, 'unknown_direction');
-                    SpreadsheetApp.getUi().alert(`Transaction ${row.id} skipped as its direction '${row.direction}' is not recognised.`)
+                    SpreadsheetApp.getUi().alert(`Transaction ${row.id} skipped as its direction '${row.direction}' is not recognised.`);
                     continue;
 
             }
